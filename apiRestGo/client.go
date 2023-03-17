@@ -1,21 +1,37 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 )
 
 type Client struct {
-	ID        string `json:"id"`
+	ID        string `json:"IdClient"`
 	FirstName string `json:"firstname"`
 	LastName  string `json:"lastname"`
 	Email     string `json:"email"`
 }
 
 var clients []Client
+var cli Client
 
 func getClients(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(clients)
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
+	i := 1
+	for {
+		err = db.QueryRow("SELECT * FROM client WHERE IdClient = ?", i).Scan(&cli.ID, &cli.FirstName, &cli.LastName, &cli.Email)
+		if err != nil {
+			break
+		}
+		json.NewEncoder(w).Encode(cli)
+
+		i++
+	}
+	defer db.Close()
+
 }
 
 func handleClient(w http.ResponseWriter, r *http.Request) {
@@ -34,14 +50,23 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func getClient(w http.ResponseWriter, r *http.Request) {
+	// var cli Client
 	id := getIdFromUrl(r.URL.Path)
-	for _, client := range clients {
-		if client.ID == id {
-			json.NewEncoder(w).Encode(client)
-			return
-		}
+	fmt.Println(id)
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
+	if err != nil {
+		log.Fatal(err)
 	}
-	http.Error(w, "Client not found", http.StatusNotFound)
+
+	err = db.QueryRow("SELECT * FROM client WHERE IdClient = ?", id).Scan(&cli.ID, &cli.FirstName, &cli.LastName, &cli.Email)
+	defer db.Close()
+	if err != nil {
+		http.Error(w, "Client not found", http.StatusNotFound)
+		return
+	}
+	fmt.Println("recuperation reussie")
+	json.NewEncoder(w).Encode(cli)
+
 }
 
 func createClient(w http.ResponseWriter, r *http.Request) {
