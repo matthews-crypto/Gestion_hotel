@@ -10,8 +10,8 @@ import (
 
 type Client struct {
 	ID        string `json:"IdClient"`
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
+	FirstName string `json:"prenom"`
+	LastName  string `json:"nom"`
 	Email     string `json:"email"`
 }
 
@@ -20,16 +20,26 @@ var cli Client
 
 func getClients(w http.ResponseWriter, r *http.Request) {
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
-	i := 1
-	for {
-		err = db.QueryRow("SELECT * FROM client WHERE IdClient = ?", i).Scan(&cli.ID, &cli.FirstName, &cli.LastName, &cli.Email)
-		if err != nil {
-			break
-		}
-		json.NewEncoder(w).Encode(cli)
-
-		i++
+	if err != nil {
+		panic(err)
 	}
+	aff, err := db.Query("SELECT * FROM client")
+	if err != nil {
+		panic(err)
+	}
+	defer aff.Close()
+	for aff.Next() {
+		var client Client
+		err := aff.Scan(&client.ID, &client.FirstName, &client.LastName, &client.Email)
+		if err != nil {
+			panic(err)
+		}
+		err = json.NewEncoder(w).Encode(client)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	defer db.Close()
 
 }
@@ -50,7 +60,7 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func getClient(w http.ResponseWriter, r *http.Request) {
-	// var cli Client
+
 	id := getIdFromUrl(r.URL.Path)
 	fmt.Println(id)
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
@@ -64,20 +74,37 @@ func getClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Client not found", http.StatusNotFound)
 		return
 	}
-	fmt.Println("recuperation reussie")
 	json.NewEncoder(w).Encode(cli)
 
 }
 
 func createClient(w http.ResponseWriter, r *http.Request) {
-	var client Client
-	err := json.NewDecoder(r.Body).Decode(&client)
+
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	ajout, err := db.Prepare("INSERT INTO client(firstname, lastname, email) VALUES(?, ?, ?)")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	err = json.NewDecoder(r.Body).Decode(&cli)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	clients = append(clients, client)
-	json.NewEncoder(w).Encode(client)
+	_, err = ajout.Exec(cli.FirstName, cli.LastName, cli.Email)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer ajout.Close()
+	defer db.Close()
+	http.Error(w, "Client created", http.StatusCreated)
+
 }
 
 func updateClient(w http.ResponseWriter, r *http.Request) {
@@ -99,16 +126,24 @@ func updateClient(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteClient(w http.ResponseWriter, r *http.Request) {
-	id := getIdFromUrl(r.URL.Path)
-	for index, client := range clients {
-
-		if client.ID == id {
-			clients = append(clients[:index], clients[index+1:]...)
-			json.NewEncoder(w).Encode(clients)
-			return
-		}
+	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/test")
+	if err != nil {
+		log.Fatal(err)
+		return
 	}
-	http.Error(w, "Client not found", http.StatusNotFound)
+	id := getIdFromUrl(r.URL.Path)
+	delete, err := db.Prepare("DELETE FROM client WHERE IdClient = ?")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	_, err = delete.Exec(id)
+	if err != nil {
+		log.Fatal(err)
+		http.Error(w, "Client not found", http.StatusNotFound)
+		return
+	}
+	http.Error(w, "Supression effectuer avec succes", http.StatusNotFound)
 }
 
 func getIdFromUrl(path string) string {
