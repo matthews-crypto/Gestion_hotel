@@ -6,11 +6,13 @@ import (
 )
 
 type Reservation struct {
-	IdReservation string `json:"idReservation"`
-	date_entree   string `json:"date_entree"`
-	date_sortie   string `json:"date_sortie"`
-	IdClient      string `json:"idClient"`
-	IdChambre     string `json:idChambre`
+	IdReservation    string `json:"idReservation"`
+	date_reservation string `json:"date_reservation"`
+	date_entree      string `json:"date_entree"`
+	date_sortie      string `json:"date_sortie"`
+	IdClient         string `json:"idClient"`
+	IdChambre        string `json:idChambre`
+	tarif            string `json:tarif`
 }
 
 var reservations []Reservation
